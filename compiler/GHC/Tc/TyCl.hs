@@ -46,7 +46,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Builtin.Types ( unitTy, makeRecoveryTyCon )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
-import GHC.Rename.Env( lookupConstructorFields )
+import GHC.Rename.Env( lookupDataConFields )
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
@@ -130,31 +130,34 @@ tcTyAndClassDecls :: [TyClGroup GhcRn]      -- Mutually-recursive groups in
                                             -- and their implicit Ids,DataCons
                          , [InstInfo GhcRn] -- Source-code instance decls info
                          , [DerivInfo]      -- Deriving info
+                         , [(Id, LHsBind GhcRn)] -- Record selector/updater bindings
                          )
 -- Fails if there are any errors
 tcTyAndClassDecls tyclds_s
   -- The code recovers internally, but if anything gave rise to
   -- an error we'd better stop now, to avoid a cascade
   -- Type check each group in dependency order folding the global env
-  = checkNoErrs $ fold_env [] [] tyclds_s
+  = checkNoErrs $ fold_env [] [] [] tyclds_s
   where
     fold_env :: [InstInfo GhcRn]
              -> [DerivInfo]
+             -> [(Id, LHsBind GhcRn)]
              -> [TyClGroup GhcRn]
-             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo])
-    fold_env inst_info deriv_info []
+             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], [(Id, LHsBind GhcRn)])
+    fold_env inst_info deriv_info rec_sel_upd_binds []
       = do { gbl_env <- getGblEnv
-           ; return (gbl_env, inst_info, deriv_info) }
-    fold_env inst_info deriv_info (tyclds:tyclds_s)
-      = do { (tcg_env, inst_info', deriv_info') <- tcTyClGroup tyclds
+           ; return (gbl_env, inst_info, deriv_info, rec_sel_upd_binds) }
+    fold_env inst_info deriv_info rec_sel_upd_binds (tyclds:tyclds_s)
+      = do { (tcg_env, inst_info', deriv_info', rec_sel_upd_binds') <- tcTyClGroup tyclds
            ; setGblEnv tcg_env $
                -- remaining groups are typechecked in the extended global env.
              fold_env (inst_info' ++ inst_info)
                       (deriv_info' ++ deriv_info)
+                      (rec_sel_upd_binds' ++ rec_sel_upd_binds)
                       tyclds_s }
 
 tcTyClGroup :: TyClGroup GhcRn
-            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo])
+            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], [(Id, LHsBind GhcRn)])
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
 tcTyClGroup (TyClGroup { group_tyclds = tyclds
@@ -195,12 +198,16 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; gbl_env <- addTyConsToGblEnv tyclss
 
            -- Step 4: check instance declarations
-       ; (gbl_env', inst_info, datafam_deriv_info) <-
+       ; (gbl_env', inst_info, fam_insts, datafam_deriv_info) <-
          setGblEnv gbl_env $
          tcInstDecls1 instds
 
+           -- Step 5: build record selectors/updaters, don't type-check them yet
+           -- See Note [Calling tcRecSelBinds] in GHC.Tc.TyCl.Utils
+       ; rec_sel_upd_binds <- mkRecSelBinds (tyclss ++ famInstsRepTyCons fam_insts)
+
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
-       ; return (gbl_env', inst_info, deriv_info) }
+       ; return (gbl_env', inst_info, deriv_info, rec_sel_upd_binds) }
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
@@ -3196,7 +3203,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConArgs exp_kind hs_args
-                 ; field_lbls <- lookupConstructorFields name
+                 ; field_lbls <- lookupDataConFields name
                  ; let (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, field_lbls, stricts)
                  }
@@ -3284,7 +3291,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
 
                  ; btys <- tcConArgs exp_kind hs_args
                  ; let (arg_tys, stricts) = unzip btys
-                 ; field_lbls <- lookupConstructorFields name
+                 ; field_lbls <- lookupDataConFields name
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
        ; imp_tvs <- zonkAndScopedSort imp_tvs
