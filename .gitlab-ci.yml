@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: e1cdfaea745989faa266f09c1d6c4c981aa34dc6
+  DOCKER_REV: 6ceb0cecaeefd4927b26c054e4897724986078c8
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
@@ -232,6 +232,17 @@ lint-release-changelogs:
     - .gitlab/ci.sh clean
   tags:
     - x86_64-linux
+
+# Verify that Hadrian builds with stack. Note that we don't actually perform a
+# build of GHC itself; we merely test that the Hadrian executable builds and
+# works (by invoking `hadrian --version`).
+stack-hadrian-build:
+  extends: .validate-linux-hadrian
+  stage: build
+  script:
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - hadrian/build-stack --version
 
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
