@@ -1518,7 +1518,6 @@ emitPrimOp dflags primop = case primop of
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
   CloneMyStack -> alwaysExternal
-  CloneThreadStack -> alwaysExternal
 
  where
   profile = targetProfile dflags
