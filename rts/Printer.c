@@ -642,7 +642,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
     }
 }
 
-static void printStack( StgStack *stack )
+// TODO: Do not merge. Only exported for debugging.
+void printStack( StgStack *stack )
 {
     printStackChunk( stack->sp, stack->stack + stack->stack_size );
 }
@@ -697,7 +698,7 @@ void printLargeAndPinnedObjects()
     for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
         Capability *cap = capabilities[cap_idx];
 
-        debugBelch("Capability %d: Current pinned object block: %p\n", 
+        debugBelch("Capability %d: Current pinned object block: %p\n",
                    cap_idx, (void*)cap->pinned_object_block);
         for (bdescr *bd = cap->pinned_object_blocks; bd; bd = bd->link) {
             debugBelch("%p\n", (void*)bd);
