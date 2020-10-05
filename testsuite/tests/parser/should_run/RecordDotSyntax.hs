@@ -2,10 +2,15 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecordDotSyntax #-}
+-- For "higher kinded data" test.
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- Choice (C2a).
 
 import Data.Function -- for &
+import Data.Functor.Identity
 
 class HasField x r a | x r -> a where
   hasField :: r -> (a -> r, a)
@@ -49,6 +54,18 @@ instance HasField "f" Grault Foo where
     hasField r = (\x -> case r of Grault { .. } -> Grault { f = x, .. }, f r)
 instance HasField "g" Grault Foo where
     hasField r = (\x -> case r of Grault { .. } -> Grault { g = x, .. }, g r)
+
+-- "Higher kinded data"
+-- (see https://reasonablypolymorphic.com/blog/higher-kinded-data/)
+type family H f a where
+  H Identity a = a
+  H f        a = f a
+data P f = P
+  { n :: H f String
+  }
+-- See https://github.com/ndmitchell/record-dot-preprocessor/pull/34.
+instance (a ~ H f String) => HasField "n" (P f) a where
+    hasField r = (\x -> case r of P { .. } -> P { n = x, .. }, n r)
 
 main = do
   let a = Foo { foo = Bar{ bar = Baz { baz = Quux { quux = 42 } } } }
@@ -113,3 +130,9 @@ main = do
   print $ c{ f } -- 42, 1
   print $ c{ f, g } -- 42, 42
   print $ c{ f, g.foo.bar.baz.quux = 4 } -- Mix top-level and nested updates; 42, 4
+
+  putStrLn "-- misc:"
+  -- Higher kinded test.
+  let p = P { n = Just "me" } :: P Maybe
+  Just me <- pure p.n
+  putStrLn $ me
