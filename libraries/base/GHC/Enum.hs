@@ -537,7 +537,7 @@ instance  Enum Int  where
 * Phase 0: optionally inline eftInt
 -}
 
-{-# NOINLINE [1] eftInt #-}
+{-# INLINABLE [1] eftInt #-}
 eftInt :: Int# -> Int# -> [Int]
 -- [x1..x2]
 eftInt x0 y | isTrue# (x0 ># y) = []
@@ -578,7 +578,7 @@ efdInt x1 x2
  | isTrue# (x2 >=# x1) = case maxInt of I# y -> efdtIntUp x1 x2 y
  | otherwise           = case minInt of I# y -> efdtIntDn x1 x2 y
 
-{-# NOINLINE [1] efdtInt #-}
+{-# INLINE [1] efdtInt #-}
 efdtInt :: Int# -> Int# -> Int# -> [Int]
 -- [x1,x2..y]
 efdtInt x1 x2 y
@@ -592,6 +592,7 @@ efdtIntFB c n x1 x2 y
  | otherwise           = efdtIntDnFB c n x1 x2 y
 
 -- Requires x2 >= x1
+{-# INLINABLE [1] efdtIntUp #-}
 efdtIntUp :: Int# -> Int# -> Int# -> [Int]
 efdtIntUp x1 x2 y    -- Be careful about overflow!
  | isTrue# (y <# x2) = if isTrue# (y <# x1) then [] else [I# x1]
@@ -623,6 +624,7 @@ efdtIntUpFB c n x1 x2 y    -- Be careful about overflow!
                in I# x1 `c` go_up x2
 
 -- Requires x2 <= x1
+{-# INLINABLE [1] efdtIntDn #-}
 efdtIntDn :: Int# -> Int# -> Int# -> [Int]
 efdtIntDn x1 x2 y    -- Be careful about underflow!
  | isTrue# (y ># x2) = if isTrue# (y ># x1) then [] else [I# x1]
@@ -718,7 +720,7 @@ maxIntWord = W# (case maxInt of I# i -> int2Word# i)
 -- The Enum rules for Word work much the same way that they do for Int.
 -- See Note [How the Enum rules work].
 
-{-# NOINLINE [1] eftWord #-}
+{-# INLINABLE [1] eftWord #-}
 eftWord :: Word# -> Word# -> [Word]
 -- [x1..x2]
 eftWord x0 y | isTrue# (x0 `gtWord#` y) = []
@@ -759,7 +761,7 @@ efdWord x1 x2
  | isTrue# (x2 `geWord#` x1) = case maxBound of W# y -> efdtWordUp x1 x2 y
  | otherwise                 = case minBound of W# y -> efdtWordDn x1 x2 y
 
-{-# NOINLINE [1] efdtWord #-}
+{-# INLINE [1] efdtWord #-}
 efdtWord :: Word# -> Word# -> Word# -> [Word]
 -- [x1,x2..y]
 efdtWord x1 x2 y
@@ -773,6 +775,7 @@ efdtWordFB c n x1 x2 y
  | otherwise                 = efdtWordDnFB c n x1 x2 y
 
 -- Requires x2 >= x1
+{-# INLINABLE [1] efdtWordUp #-}
 efdtWordUp :: Word# -> Word# -> Word# -> [Word]
 efdtWordUp x1 x2 y    -- Be careful about overflow!
  | isTrue# (y `ltWord#` x2) = if isTrue# (y `ltWord#` x1) then [] else [W# x1]
@@ -804,6 +807,7 @@ efdtWordUpFB c n x1 x2 y    -- Be careful about overflow!
                in W# x1 `c` go_up x2
 
 -- Requires x2 <= x1
+{-# INLINABLE [1] efdtWordDn #-}
 efdtWordDn :: Word# -> Word# -> Word# -> [Word]
 efdtWordDn x1 x2 y    -- Be careful about underflow!
  | isTrue# (y `gtWord#` x2) = if isTrue# (y `gtWord#` x1) then [] else [W# x1]
