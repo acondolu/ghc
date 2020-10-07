@@ -123,7 +123,7 @@ static void *itimer_thread_func(void *_handle_tick)
     // Benign race: If we don't see that exited was set in one iteration we will
     // see it next time.
     TSAN_ANNOTATE_BENIGN_RACE(&exited, "itimer_thread_func");
-    while (!exited) {
+    while (!RELAXED_LOAD(&exited)) {
         if (USE_TIMERFD_FOR_ITIMER) {
             ssize_t r = read(timerfd, &nticks, sizeof(nticks));
             if ((r == 0) && (errno == 0)) {
@@ -208,8 +208,8 @@ stopTicker(void)
 void
 exitTicker (bool wait)
 {
-    ASSERT(!exited);
-    exited = true;
+    ASSERT(!RELAXED_LOAD(&exited));
+    RELAXED_STORE(&exited, true);
     // ensure that ticker wakes up if stopped
     startTicker();
 
